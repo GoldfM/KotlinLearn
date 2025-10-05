@@ -14,11 +14,20 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import java.io.File
 import java.time.LocalDateTime
+import org.slf4j.LoggerFactory
+import org.slf4j.Logger
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.fillMaxWidth
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
 
+    //private val log: Logger = LoggerFactory.getLogger(MainActivity::class.java)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        val log = LoggerFactory.getLogger(MainActivity::class.java);
+        super.onCreate(savedInstanceState)
+        log.info("Приложение запущено")
         val fileStorage = FileStorage(File(this.filesDir, "todo_items.json"))
 
         val item1 = TodoItem(text = "Проснуться", color = Color.Red,
@@ -31,27 +40,87 @@ class MainActivity : ComponentActivity() {
         fileStorage.add(item3)
 
 
-        Log.d("User logs","После добавления: ${fileStorage.items}")
+        log.debug("После добавления: ${fileStorage.items}")
 
         fileStorage.saveToFile()
         Thread.sleep(6000)
 
-        Log.d("User logs","После дедлайна: ${fileStorage.items}")
+        log.debug("После дедлайна: ${fileStorage.items}")
 
         fileStorage.remove(item3.uid).let {
-            Log.d("User logs","После удаления: ${fileStorage.items}")
+            log.debug("После удаления: ${fileStorage.items}")
         }
 
         fileStorage.loadFromFile()
-        Log.d("User logs","После загрузки: ${fileStorage.items}")
-
+        log.debug("После загрузки: ${fileStorage.items}")
         setContent {
             ToDosTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = Color.Yellow
                 ) {
-                    Greeting("World")
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        // Заголовок
+                        Text(
+                            text = "Будущий TODOList (оч крутой)",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = Color.Black,
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        )
+
+                        // Задача 1
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondary,
+                            shape = MaterialTheme.shapes.medium,
+                            shadowElevation = 4.dp, // Тень для объема
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "Задача 1",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(16.dp),
+                                color =Color.Black
+                            )
+                        }
+
+                        // Задача 2
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondary,
+                            shape = MaterialTheme.shapes.medium,
+                            shadowElevation = 4.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "Задача 2",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(16.dp),
+                                color = Color.Black
+                            )
+                        }
+
+                        // Задача 3
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondary,
+                            shape = MaterialTheme.shapes.medium,
+                            shadowElevation = 4.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "Задача 3",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(16.dp),
+                                color = Color.Black
+                            )
+                        }
+                    }
                 }
             }
         }
