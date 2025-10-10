@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.example.todos"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.todos"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 33
         versionCode = 1
         versionName = "1.0"
 
@@ -44,6 +44,10 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation("org.slf4j:slf4j-api:2.0.7")
+    implementation("com.github.tony19:logback-android:3.0.0")
+    implementation("androidx.core:core-splashscreen:1.2.0-rc01")
+    //testImplementation("ch.qos.logback:logback-classic:1.2.11")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

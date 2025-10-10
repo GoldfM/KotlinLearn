@@ -11,32 +11,42 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+import androidx.compose.ui.graphics.Color
 
+// Сгенерированные цвета для светлой темы
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = Color(0xFFFF9800),       // Оранжевый
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFECDC),
+    onPrimaryContainer = Color(0xFF261900),
+    secondary = Color(0xFF6D5F00),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFF9E56C),
+    onSecondaryContainer = Color(0xFF211C00),
+    tertiary = Color(0xFF4C6300),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFC9EB7E),
+    onTertiaryContainer = Color(0xFF141E00),
+    background = Color(0xFFFCFCFC),    // Светло-серый фон
+    onBackground = Color(0xFF1D1D1D),
+    surface = Color(0xFFFCFCFC),
+    onSurface = Color(0xFF1D1D1D),
+    surfaceVariant = Color(0xFFEFEFEF),
+    onSurfaceVariant = Color(0xFF4A4A4A),
+    outline = Color(0xFF7C7C7C)
+    // ... остальные цвета
 )
 
+// Сгенерированные цвета для темной темы (инвертированная схема)
+private val DarkColorScheme = darkColorScheme(
+    primary = Color(0xFFFF5722),       // Более темный оранжевый
+    secondary = Color(0xFFFFD600),
+    background = Color(0xFF0190FF),    // Темно-серый фон
+    // ... остальные цвета
+)
 @Composable
 fun ToDosTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
+    darkTheme: Boolean = true,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
@@ -45,7 +55,6 @@ fun ToDosTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
