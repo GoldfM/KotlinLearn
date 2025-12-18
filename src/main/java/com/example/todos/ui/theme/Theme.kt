@@ -13,36 +13,17 @@ import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.ui.graphics.Color
 
-// Сгенерированные цвета для светлой темы
+
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFFFF9800),       // Оранжевый
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFECDC),
-    onPrimaryContainer = Color(0xFF261900),
+    primary = Color(0xFFFF9800),
     secondary = Color(0xFF6D5F00),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFF9E56C),
-    onSecondaryContainer = Color(0xFF211C00),
-    tertiary = Color(0xFF4C6300),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFC9EB7E),
-    onTertiaryContainer = Color(0xFF141E00),
-    background = Color(0xFFFCFCFC),    // Светло-серый фон
-    onBackground = Color(0xFF1D1D1D),
-    surface = Color(0xFFFCFCFC),
-    onSurface = Color(0xFF1D1D1D),
-    surfaceVariant = Color(0xFFEFEFEF),
-    onSurfaceVariant = Color(0xFF4A4A4A),
-    outline = Color(0xFF7C7C7C)
-    // ... остальные цвета
+
 )
 
-// Сгенерированные цвета для темной темы (инвертированная схема)
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFF5722),       // Более темный оранжевый
+    primary = Color(0xFFFF5722),
     secondary = Color(0xFFFFD600),
-    background = Color(0xFF0190FF),    // Темно-серый фон
-    // ... остальные цвета
+    background = Color(0xFF0190FF),
 )
 @Composable
 fun ToDosTheme(

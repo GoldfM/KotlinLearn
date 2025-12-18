@@ -2,23 +2,28 @@ package com.example.todos
 
 import org.json.JSONArray
 import java.io.File
-import java.time.LocalDateTime
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import org.slf4j.LoggerFactory
-import org.slf4j.Logger
 
 class FileStorage(private val storageFile: File) {
-    private val log: Logger = LoggerFactory.getLogger(MainActivity::class.java)
+    private val log = LoggerFactory.getLogger(FileStorage::class.java)
     private val _items: MutableList<TodoItem> = mutableListOf()
 
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+
     val items: List<TodoItem>
-        get() {
-            removeExpiredItems()
-            return _items.toList()
-        }
+        get() = _items.toList()
 
     fun add(item: TodoItem) {
-        log.info("Добавление задачи: '{}' (приоритет: {}, дедлайн: {}, uid: {})",
-            item.text, item.priority, item.deadline ?: "нет", item.uid)
+        log.info(
+            "Добавление задачи: {} (приоритет: {}, дедлайн: {}, uid: {})",
+            item.text,
+            item.priority,
+            item.deadline?.let { dateFormat.format(it) } ?: "нет",
+            item.uid
+        )
         _items.add(item)
         log.debug("Всего задач после добавления: {}", _items.size)
     }
@@ -37,28 +42,12 @@ class FileStorage(private val storageFile: File) {
         }
     }
 
-    private fun removeExpiredItems() {
-        log.debug("Проверка просроченных задач")
-        val now = LocalDateTime.now()
-        val expiredItems = _items.filter { i -> i.deadline != null && now.isAfter(i.deadline) }
-
-        if (expiredItems.isNotEmpty()) {
-            log.info("Найдено просроченных задач: {}", expiredItems.size)
-            expiredItems.forEach { item ->
-                log.info("Автоматическое удаление просроченной задачи: '{}' (uid: {})",
-                    item.text, item.uid)
-            }
-            _items.removeAll(expiredItems.toSet())
-        } else {
-            log.debug("Просроченных задач не найдено")
-        }
-    }
-
     fun saveToFile() {
         log.info("Сохранение задач в файл: {}", storageFile.absolutePath)
-        removeExpiredItems()
         val jsonItems = JSONArray()
-        items.forEach { item -> jsonItems.put(item.json) }
+        items.forEach { item ->
+            jsonItems.put(item.toJson(dateFormat))
+        }
 
         try {
             storageFile.writeText(jsonItems.toString())
@@ -88,7 +77,7 @@ class FileStorage(private val storageFile: File) {
             for (i in 0 until jsonArray.length()) {
                 try {
                     val jsonItem = jsonArray.getJSONObject(i)
-                    val newItem = parse(jsonItem)
+                    val newItem = parseTodoItem(jsonItem, dateFormat)
                     if (newItem != null) {
                         _items.add(newItem)
                         loadedCount++
@@ -100,10 +89,59 @@ class FileStorage(private val storageFile: File) {
             }
 
             log.info("Успешно загружено задач из файла: {}", loadedCount)
-            removeExpiredItems()
 
         } catch (e: Exception) {
             log.error("Ошибка при загрузке из файла: {}", e.message)
         }
+    }
+
+    fun updateItem(updatedItem: TodoItem): Boolean {
+        val index = _items.indexOfFirst { it.uid == updatedItem.uid }
+        return if (index != -1) {
+            _items[index] = updatedItem
+            log.info("Обновлена задача: {} (uid: {})", updatedItem.text, updatedItem.uid)
+            true
+        } else {
+            log.warn("Задача с uid {} не найдена для обновления", updatedItem.uid)
+            false
+        }
+    }
+}
+
+// Функция-расширение для TodoItem
+fun TodoItem.toJson(dateFormat: SimpleDateFormat): org.json.JSONObject {
+    return org.json.JSONObject().apply {
+        put("uid", uid)
+        put("text", text)
+        put("priority", priority.name)
+        put("isDone", isDone)
+        put("color", color.value.toLong())
+
+        deadline?.let {
+            put("deadline", dateFormat.format(it))
+        }
+    }
+}
+
+// Отдельная функция для парсинга
+fun parseTodoItem(json: org.json.JSONObject, dateFormat: SimpleDateFormat): TodoItem? {
+    return try {
+        TodoItem(
+            uid = json.getString("uid"),
+            text = json.getString("text"),
+            priority = Priority.valueOf(json.getString("priority")),
+            isDone = json.getBoolean("isDone"),
+            color = androidx.compose.ui.graphics.Color(json.getLong("color").toULong()),
+            deadline = if (json.has("deadline")) {
+                try {
+                    dateFormat.parse(json.getString("deadline"))
+                } catch (e: Exception) {
+                    null
+                }
+            } else null
+        )
+    } catch (e: Exception) {
+        LoggerFactory.getLogger(FileStorage::class.java).error("Ошибка парсинга TodoItem: {}", e.message)
+        null
     }
 }

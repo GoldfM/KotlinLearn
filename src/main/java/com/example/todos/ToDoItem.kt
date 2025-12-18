@@ -1,8 +1,8 @@
 package com.example.todos
 
 import androidx.compose.ui.graphics.Color
+import java.util.Date
 import java.util.UUID
-import java.time.LocalDateTime
 
 enum class Priority {
     MINOR,
@@ -16,5 +16,12 @@ data class TodoItem(
     val uid: String = UUID.randomUUID().toString(),
     val isDone: Boolean = false,
     val color: Color = Color.White,
-    val deadline: LocalDateTime? = null
+    val deadline: Date? = null
+)
+
+data class EditTodoState(
+    val text: String = "",
+    val priority: Priority = Priority.STANDARD,
+    val isDone: Boolean = false,
+    val deadline: Date? = null
 )
