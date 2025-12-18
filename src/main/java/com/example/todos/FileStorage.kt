@@ -106,6 +106,11 @@ class FileStorage(private val storageFile: File) {
             false
         }
     }
+
+    // Новый метод для получения задачи по ID
+    fun getItemById(uid: String): TodoItem? {
+        return _items.find { it.uid == uid }
+    }
 }
 
 // Функция-расширение для TodoItem

@@ -1,42 +1,14 @@
 package com.example.todos
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -83,7 +55,12 @@ fun EditTodoScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(text = if (todoItem == null) "Новое дело" else "Редактирование") },
+                title = {
+                    Text(
+                        text = if (todoItem == null) "Новое дело" else "Редактирование",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
                 navigationIcon = {
                     TextButton(onClick = onBack) {
                         Text("← Назад")
@@ -99,20 +76,20 @@ fun EditTodoScreen(
                 Button(
                     onClick = {
                         val newItem = TodoItem(
-                            text = editState.text,
+                            text = editState.text.trim(),
                             priority = editState.priority,
                             isDone = editState.isDone,
+                            color = todoItem?.color ?: Color.White,
                             deadline = editState.deadline
                         )
                         onSave(newItem)
-                        onBack()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    enabled = editState.text.isNotBlank()
+                    enabled = editState.text.trim().isNotBlank()
                 ) {
-                    Text("✔ Сохранить")
+                    Text("💾 Сохранить")
                 }
             }
         }
@@ -159,7 +136,7 @@ fun EditTodoScreen(
                     }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Выполнено")
+                Text("Выполнено", style = MaterialTheme.typography.bodyLarge)
             }
 
             // Выбор приоритета
@@ -184,7 +161,7 @@ fun EditTodoScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 
@@ -223,7 +200,7 @@ fun PrioritySelector(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Приоритет")
+                Text("Приоритет", style = MaterialTheme.typography.bodyLarge)
                 PriorityChip(priority = selectedPriority)
             }
         }
@@ -257,37 +234,6 @@ fun PrioritySelector(
 }
 
 @Composable
-fun PriorityChip(priority: Priority) {
-    val (text, color) = when (priority) {
-        Priority.MINOR -> Pair("Низкий", Color.Green)
-        Priority.STANDARD -> Pair("Стандартный", Color.Yellow)
-        Priority.CRITICAL -> Pair("Высокий", Color.Red)
-    }
-
-    Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "○",
-                color = color,
-                style = MaterialTheme.typography.labelSmall
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = text,
-                color = color,
-                style = MaterialTheme.typography.labelSmall
-            )
-        }
-    }
-}
-
-@Composable
 fun DeadlineSelector(
     deadline: Date?,
     onDeadlineSelected: (Date) -> Unit,
@@ -303,7 +249,7 @@ fun DeadlineSelector(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Дедлайн")
+            Text("Дедлайн", style = MaterialTheme.typography.bodyLarge)
 
             if (deadline != null) {
                 TextButton(onClick = onClearDeadline) {
@@ -328,12 +274,13 @@ fun DeadlineSelector(
             ) {
                 Text(
                     text = deadline?.let { dateFormat.format(it) } ?: "Не установлен",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = if (deadline == null) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "📅",
-                    color = MaterialTheme.colorScheme.primary
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
         }
@@ -350,20 +297,25 @@ fun SimpleDatePickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Выберите дату") },
+        title = { Text("Выберите дату", style = MaterialTheme.typography.titleLarge) },
         text = {
             val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
             Column {
-                // Простой выбор даты - добавление дней
-                Text("Выбрано: ${dateFormat.format(selectedDate)}")
+                // Отображение выбранной даты
+                Text(
+                    text = "Выбрано: ${dateFormat.format(selectedDate)}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
+                // Быстрый выбор дней
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Button(onClick = {
+                    OutlinedButton(onClick = {
                         calendar.time = selectedDate
                         calendar.add(Calendar.DAY_OF_MONTH, -1)
                         selectedDate = calendar.time
@@ -378,7 +330,7 @@ fun SimpleDatePickerDialog(
                         Text("Сегодня")
                     }
 
-                    Button(onClick = {
+                    OutlinedButton(onClick = {
                         calendar.time = selectedDate
                         calendar.add(Calendar.DAY_OF_MONTH, 1)
                         selectedDate = calendar.time
@@ -387,14 +339,14 @@ fun SimpleDatePickerDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Быстрый выбор
+                // Дополнительные опции
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Button(onClick = {
+                    OutlinedButton(onClick = {
                         calendar.time = Date()
                         calendar.add(Calendar.DAY_OF_MONTH, 7)
                         selectedDate = calendar.time
@@ -402,7 +354,7 @@ fun SimpleDatePickerDialog(
                         Text("Через неделю")
                     }
 
-                    Button(onClick = {
+                    OutlinedButton(onClick = {
                         calendar.time = Date()
                         calendar.add(Calendar.MONTH, 1)
                         selectedDate = calendar.time
@@ -413,7 +365,7 @@ fun SimpleDatePickerDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     onDateSelected(selectedDate)
                 }
@@ -422,7 +374,7 @@ fun SimpleDatePickerDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            OutlinedButton(onClick = onDismiss) {
                 Text("Отмена")
             }
         }
