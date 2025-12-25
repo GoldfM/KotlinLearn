@@ -1,89 +1,81 @@
 package com.example.todos
 
+import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Card
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodoListScreen(
-    fileStorage: FileStorage,
+    repository: TodoRepository,
     onTodoClick: (TodoItem) -> Unit,
     onAddTodo: () -> Unit
 ) {
-    val todos = remember { mutableStateListOf<TodoItem>() }
+    val todos by repository.todosFlow.collectAsState()
+    val syncState by repository.syncState.collectAsState()
+
     var deletedItem by remember { mutableStateOf<TodoItem?>(null) }
     var showUndoSnackbar by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
-    // Загружаем задачи из хранилища
     LaunchedEffect(Unit) {
-        todos.clear()
-        todos.addAll(fileStorage.items)
-    }
-
-    // Функция для обновления задачи в списке
-    val updateTodoInList = { updatedTodo: TodoItem ->
-        val index = todos.indexOfFirst { it.uid == updatedTodo.uid }
-        if (index != -1) {
-            todos[index] = updatedTodo
-        }
+        repository.syncWithBackend()
     }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Список дел") },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Список дел")
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        when (syncState) {
+                            is SyncState.Syncing -> {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                            is SyncState.Success -> {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = "Синхронизировано",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.Green
+                                )
+                            }
+                            is SyncState.Error -> {
+                                Icon(
+                                    Icons.Filled.Error,
+                                    contentDescription = "Ошибка синхронизации",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.Red
+                                )
+                            }
+                            else -> {}
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.primary
@@ -123,6 +115,17 @@ fun TodoListScreen(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                         modifier = Modifier.padding(top = 8.dp)
                     )
+
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                repository.syncWithBackend()
+                            }
+                        },
+                        modifier = Modifier.padding(top = 16.dp)
+                    ) {
+                        Text("Синхронизировать с бэкендом")
+                    }
                 }
             } else {
                 LazyColumn(
@@ -136,21 +139,19 @@ fun TodoListScreen(
                         itemContent = { todo ->
                             SwipeToDeleteTodoItem(
                                 todo = todo,
-                                fileStorage = fileStorage,
+                                repository = repository,
                                 onTodoClick = { onTodoClick(todo) },
                                 onDelete = {
                                     deletedItem = todo
                                     showUndoSnackbar = true
-                                    val index = todos.indexOf(todo)
-                                    if (index != -1) {
-                                        todos.removeAt(index)
-                                        fileStorage.remove(todo.uid)
-                                        fileStorage.saveToFile()
+                                    scope.launch {
+                                        repository.deleteTodo(todo.uid)
                                     }
                                 },
                                 onToggleDone = { updatedTodo ->
-                                    updateTodoInList(updatedTodo)
-                                    // fileStorage.updateItem уже вызывается внутри SwipeToDeleteTodoItem
+                                    scope.launch {
+                                        repository.updateTodo(updatedTodo)
+                                    }
                                 }
                             )
                         }
@@ -158,7 +159,6 @@ fun TodoListScreen(
                 }
             }
 
-            // Уведомление об удалении с возможностью отмены
             AnimatedVisibility(
                 visible = showUndoSnackbar,
                 enter = expandVertically(expandFrom = Alignment.Bottom),
@@ -188,9 +188,9 @@ fun TodoListScreen(
                             TextButton(
                                 onClick = {
                                     deletedItem?.let { item ->
-                                        todos.add(item)
-                                        fileStorage.add(item)
-                                        fileStorage.saveToFile()
+                                        scope.launch {
+                                            repository.addTodo(item)
+                                        }
                                     }
                                     showUndoSnackbar = false
                                     deletedItem = null
@@ -205,42 +205,37 @@ fun TodoListScreen(
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToDeleteTodoItem(
     todo: TodoItem,
-    fileStorage: FileStorage,
+    repository: TodoRepository,
     onTodoClick: () -> Unit,
     onDelete: () -> Unit,
     onToggleDone: (TodoItem) -> Unit
 ) {
-    // Переменная для отслеживания, нужно ли удалить элемент
     var shouldDelete by remember { mutableStateOf(false) }
 
-    // Используем состояние для SwipeToDismissBox
     val swipeToDismissBoxState = rememberSwipeToDismissBoxState(
         confirmValueChange = { dismissValue ->
             when (dismissValue) {
-                SwipeToDismissBoxValue.EndToStart -> { // Свайп влево = удаление
-                    shouldDelete = true // Помечаем для удаления
-                    true // Возвращаем true для анимации удаления
+                SwipeToDismissBoxValue.EndToStart -> {
+                    shouldDelete = true
+                    true
                 }
-                SwipeToDismissBoxValue.StartToEnd -> { // Свайп вправо = отметка выполненным
+                SwipeToDismissBoxValue.StartToEnd -> {
                     val updatedTodo = todo.copy(isDone = !todo.isDone)
-                    onToggleDone(updatedTodo) // Обновляем состояние
-                    fileStorage.updateItem(updatedTodo) // Сохраняем в хранилище
-                    fileStorage.saveToFile()
-                    false // Возвращаем false, чтобы элемент остался на месте
+                    onToggleDone(updatedTodo)
+                    true
                 }
                 else -> false
             }
         }
     )
 
-    // Если нужно удалить - вызываем onDelete
     if (shouldDelete) {
         LaunchedEffect(Unit) {
-            // Даем время для завершения анимации свайпа
             kotlinx.coroutines.delay(300)
             onDelete()
         }
@@ -249,7 +244,6 @@ fun SwipeToDeleteTodoItem(
     SwipeToDismissBox(
         state = swipeToDismissBoxState,
         modifier = Modifier.fillMaxWidth(),
-        // Фоновый контент, который показывается при свайпе
         backgroundContent = {
             Box(
                 modifier = Modifier
@@ -321,7 +315,6 @@ fun SwipeToDeleteTodoItem(
             }
         }
     ) {
-        // Основной контент — карточка задачи
         TodoItemCard(
             todo = todo,
             onClick = onTodoClick,
@@ -331,6 +324,7 @@ fun SwipeToDeleteTodoItem(
         )
     }
 }
+
 @Composable
 fun TodoItemCard(
     todo: TodoItem,
@@ -377,7 +371,6 @@ fun TodoItemCard(
                 PriorityChip(priority = todo.priority)
             }
 
-            // Статус выполнения
             Text(
                 text = if (todo.isDone) "✓ Выполнено" else "⏳ В процессе",
                 style = MaterialTheme.typography.labelSmall,

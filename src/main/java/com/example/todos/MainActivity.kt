@@ -3,11 +3,11 @@ package com.example.todos
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
@@ -18,6 +18,7 @@ import androidx.navigation.navArgument
 import com.example.todos.ui.theme.ToDosTheme
 import org.slf4j.LoggerFactory
 import java.io.File
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,38 +44,34 @@ class MainActivity : ComponentActivity() {
 fun TodoApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val fileStorage = remember {
-        FileStorage(File(context.filesDir, "todo_items.json"))
+
+    val repository = remember {
+        val fileStorage = FileStorage(File(context.filesDir, "todo_items.json"))
+        fileStorage.loadFromFile()
+        TodoRepository(fileStorage)
     }
-    fileStorage.loadFromFile()
 
     NavHost(
         navController = navController,
-        startDestination = "todo_list" // Стартовая точка
+        startDestination = "todo_list"
     ) {
-        // 1. Экран списка
         composable("todo_list") {
             TodoListScreen(
-                fileStorage = fileStorage,
+                repository = repository,
                 onTodoClick = { todo ->
-                    // Переход к редактированию существующей задачи с её ID
                     navController.navigate("edit_todo/${todo.uid}")
                 },
                 onAddTodo = {
-                    // Переход к созданию новой задачи (без ID)
                     navController.navigate("edit_todo")
                 }
             )
         }
 
-        // 2. Экран создания новой задачи (БЕЗ параметра)
-        composable("edit_todo") { backStackEntry ->
-            // todoItem = null, поэтому создаем новую задачу
+        composable("edit_todo") {
             EditTodoScreen(
                 todoItem = null,
-                onSave = { savedTodo ->
-                    fileStorage.add(savedTodo)
-                    fileStorage.saveToFile()
+                repository = repository,
+                onSave = {
                     navController.popBackStack()
                 },
                 onBack = {
@@ -83,7 +80,6 @@ fun TodoApp() {
             )
         }
 
-        // 3. Экран редактирования существующей задачи (С параметром)
         composable(
             route = "edit_todo/{todoId}",
             arguments = listOf(
@@ -93,19 +89,34 @@ fun TodoApp() {
             )
         ) { backStackEntry ->
             val todoId = backStackEntry.arguments?.getString("todoId")!!
-            val todoItem = fileStorage.getItemById(todoId)
 
-            EditTodoScreen(
-                todoItem = todoItem,
-                onSave = { savedTodo ->
-                    fileStorage.updateItem(savedTodo)
-                    fileStorage.saveToFile()
-                    navController.popBackStack()
-                },
-                onBack = {
-                    navController.popBackStack()
+            var todoItem by remember { mutableStateOf<TodoItem?>(null) }
+
+            LaunchedEffect(todoId) {
+                todoItem = repository.getTodoById(todoId)
+            }
+
+            if (todoItem != null) {
+                EditTodoScreen(
+                    todoItem = todoItem,
+                    repository = repository,
+                    onSave = {
+                        navController.popBackStack()
+                    },
+                    onBack = {
+                        navController.popBackStack()
+                    }
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
                 }
-            )
+            }
         }
     }
 }

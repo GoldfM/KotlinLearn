@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -28,6 +29,7 @@ import java.util.Locale
 @Composable
 fun EditTodoScreen(
     todoItem: TodoItem? = null,
+    repository: TodoRepository,
     onSave: (TodoItem) -> Unit,
     onBack: () -> Unit
 ) {
@@ -47,6 +49,7 @@ fun EditTodoScreen(
     val scrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -80,8 +83,18 @@ fun EditTodoScreen(
                             priority = editState.priority,
                             isDone = editState.isDone,
                             color = todoItem?.color ?: Color.White,
-                            deadline = editState.deadline
+                            deadline = editState.deadline,
+                            uid = todoItem?.uid ?: java.util.UUID.randomUUID().toString()
                         )
+
+                        scope.launch {
+                            if (todoItem == null) {
+                                repository.addTodo(newItem)
+                            } else {
+                                repository.updateTodo(newItem)
+                            }
+                        }
+
                         onSave(newItem)
                     },
                     modifier = Modifier
@@ -101,7 +114,6 @@ fun EditTodoScreen(
                 .verticalScroll(scrollState)
                 .alpha(if (editState.isDone) 0.6f else 1f)
         ) {
-            // Поле ввода текста
             OutlinedTextField(
                 value = textFieldValue,
                 onValueChange = {
@@ -122,7 +134,6 @@ fun EditTodoScreen(
                 keyboardActions = KeyboardActions(onDone = { keyboardController?.hide() })
             )
 
-            // Чекбокс "Выполнено"
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -139,7 +150,6 @@ fun EditTodoScreen(
                 Text("Выполнено", style = MaterialTheme.typography.bodyLarge)
             }
 
-            // Выбор приоритета
             PrioritySelector(
                 selectedPriority = editState.priority,
                 onPrioritySelected = { priority ->
@@ -148,7 +158,6 @@ fun EditTodoScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            // Выбор дедлайна
             DeadlineSelector(
                 deadline = editState.deadline,
                 onDeadlineSelected = { date ->
@@ -165,7 +174,6 @@ fun EditTodoScreen(
         }
     }
 
-    // Простой диалог выбора даты
     if (showDatePicker) {
         SimpleDatePickerDialog(
             onDateSelected = { date ->
@@ -301,7 +309,6 @@ fun SimpleDatePickerDialog(
         text = {
             val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
             Column {
-                // Отображение выбранной даты
                 Text(
                     text = "Выбрано: ${dateFormat.format(selectedDate)}",
                     style = MaterialTheme.typography.bodyLarge,
@@ -310,7 +317,6 @@ fun SimpleDatePickerDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Быстрый выбор дней
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
@@ -324,7 +330,7 @@ fun SimpleDatePickerDialog(
                     }
 
                     Button(onClick = {
-                        calendar.time = Date() // Сегодня
+                        calendar.time = Date()
                         selectedDate = calendar.time
                     }) {
                         Text("Сегодня")
@@ -341,7 +347,6 @@ fun SimpleDatePickerDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Дополнительные опции
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
