@@ -1,19 +1,16 @@
 package com.example.todos
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import java.util.*
 
 class TodoRepository(
-    private val fileStorage: FileStorage,
-    private val syncInterval: Long = 30000 // 30 секунд
+    private val fileStorage: FileStorage
 ) {
     private val log = LoggerFactory.getLogger(TodoRepository::class.java)
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val apiClient = TodoApiClient()
+    private val converter = TodoApiConverter()
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private val _todosFlow = MutableStateFlow<List<TodoItem>>(emptyList())
     val todosFlow: StateFlow<List<TodoItem>> = _todosFlow.asStateFlow()
@@ -22,117 +19,110 @@ class TodoRepository(
     val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
 
     init {
-        log.info("Инициализация репозитория")
         loadFromCache()
-        startPeriodicSync()
-    }
-
-    private fun loadFromCache() {
-        log.info("Загрузка задач из кэша")
-        _todosFlow.value = fileStorage.items
-    }
-
-    private fun startPeriodicSync() {
         scope.launch {
-            while (true) {
-                delay(syncInterval)
-                syncWithBackend()
-            }
+            loadFromServer()
         }
     }
 
-    suspend fun syncWithBackend() {
-        log.info("Начало синхронизации с бэкендом")
+    private fun loadFromCache() {
+        _todosFlow.value = fileStorage.items
+    }
+
+    suspend fun loadFromServer() {
         _syncState.value = SyncState.Syncing
 
         try {
-            delay(1000)
+            val networkItems = apiClient.loadTodos()
+            val localItems = networkItems.map { converter.toLocalTodoItem(it) }
 
-            val backendItems = fetchFromBackend()
+            fileStorage.items.forEach { fileStorage.remove(it.uid) }
+            localItems.forEach { fileStorage.add(it) }
+            fileStorage.saveToFile()
 
-            updateCacheWithBackendData(backendItems)
-
-            _syncState.value = SyncState.Success("Синхронизировано")
-            log.info("Синхронизация успешна")
-
+            _todosFlow.value = localItems
+            _syncState.value = SyncState.Success("Загружено ${localItems.size} задач")
         } catch (e: Exception) {
-            _syncState.value = SyncState.Error("Ошибка синхронизации: ${e.message}")
-            log.error("Ошибка синхронизации: ${e.message}")
-        } finally {
-            delay(2000)
-            _syncState.value = SyncState.Idle
+            _syncState.value = SyncState.Error("Ошибка: ${e.message}")
         }
     }
 
     suspend fun addTodo(todo: TodoItem) {
-        log.info("Добавление задачи: ${todo.text}")
+        _syncState.value = SyncState.Syncing
 
-        fileStorage.add(todo)
-        fileStorage.saveToFile()
+        try {
+            loadFromServer()
+            val networkTodo = converter.toNetworkTodoItem(todo)
+            val success = apiClient.addTodo(networkTodo)
 
-        _todosFlow.value = fileStorage.items
-
-        scope.launch {
-            sendToBackend(todo)
+            if (success) {
+                loadFromServer()
+                _syncState.value = SyncState.Success("Задача добавлена")
+            } else {
+                fileStorage.add(todo)
+                fileStorage.saveToFile()
+                _todosFlow.value = fileStorage.items
+                _syncState.value = SyncState.Error("Задача сохранена локально")
+            }
+        } catch (e: Exception) {
+            fileStorage.add(todo)
+            fileStorage.saveToFile()
+            _todosFlow.value = fileStorage.items
+            _syncState.value = SyncState.Error("Ошибка: ${e.message}")
         }
     }
 
     suspend fun updateTodo(todo: TodoItem) {
-        log.info("Обновление задачи: ${todo.uid}")
+        _syncState.value = SyncState.Syncing
 
-        fileStorage.updateItem(todo)
-        fileStorage.saveToFile()
-        _todosFlow.value = fileStorage.items
+        try {
+            loadFromServer()
+            val networkTodo = converter.toNetworkTodoItem(todo)
+            val success = apiClient.updateTodo(networkTodo)
 
-        scope.launch {
-            updateOnBackend(todo)
+            if (success) {
+                loadFromServer()
+                _syncState.value = SyncState.Success("Задача обновлена")
+            } else {
+                fileStorage.updateItem(todo)
+                fileStorage.saveToFile()
+                _todosFlow.value = fileStorage.items
+                _syncState.value = SyncState.Error("Задача обновлена локально")
+            }
+        } catch (e: Exception) {
+            fileStorage.updateItem(todo)
+            fileStorage.saveToFile()
+            _todosFlow.value = fileStorage.items
+            _syncState.value = SyncState.Error("Ошибка: ${e.message}")
         }
     }
 
     suspend fun deleteTodo(uid: String) {
-        log.info("Удаление задачи: $uid")
+        _syncState.value = SyncState.Syncing
 
-        fileStorage.remove(uid)
-        fileStorage.saveToFile()
-        _todosFlow.value = fileStorage.items
+        try {
+            loadFromServer()
+            val success = apiClient.deleteTodo(uid)
 
-        scope.launch {
-            deleteFromBackend(uid)
+            if (success) {
+                loadFromServer()
+                _syncState.value = SyncState.Success("Задача удалена")
+            } else {
+                fileStorage.remove(uid)
+                fileStorage.saveToFile()
+                _todosFlow.value = fileStorage.items
+                _syncState.value = SyncState.Error("Задача удалена локально")
+            }
+        } catch (e: Exception) {
+            fileStorage.remove(uid)
+            fileStorage.saveToFile()
+            _todosFlow.value = fileStorage.items
+            _syncState.value = SyncState.Error("Ошибка: ${e.message}")
         }
     }
 
     suspend fun getTodoById(uid: String): TodoItem? {
         return fileStorage.getItemById(uid)
-    }
-
-    private suspend fun fetchFromBackend(): List<TodoItem> {
-        log.info("[Бэкенд] Запрос списка задач")
-        return fileStorage.items
-    }
-
-    private suspend fun sendToBackend(todo: TodoItem) {
-        log.info("[Бэкенд] Отправка задачи: ${todo.text}")
-        delay(500) // Имитация сетевой задержки
-        log.info("[Бэкенд] Задача отправлена успешно")
-    }
-
-    private suspend fun updateOnBackend(todo: TodoItem) {
-        log.info("[Бэкенд] Обновление задачи: ${todo.uid}")
-        delay(500)
-        log.info("[Бэкенд] Задача обновлена успешно")
-    }
-
-    private suspend fun deleteFromBackend(uid: String) {
-        log.info("[Бэкенд] Удаление задачи: $uid")
-        delay(500)
-        log.info("[Бэкенд] Задача удалена успешно")
-    }
-
-    private fun updateCacheWithBackendData(backendItems: List<TodoItem>) {
-        log.info("Обновление кэша данными с бэкенда")
-        backendItems.forEach {
-            log.debug("Задача с бэкенда: ${it.text}")
-        }
     }
 }
 

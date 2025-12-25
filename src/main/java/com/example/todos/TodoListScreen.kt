@@ -1,6 +1,5 @@
 package com.example.todos
 
-import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.background
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,11 +36,6 @@ fun TodoListScreen(
     var deletedItem by remember { mutableStateOf<TodoItem?>(null) }
     var showUndoSnackbar by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        repository.syncWithBackend()
-    }
-
 
     Scaffold(
         topBar = {
@@ -120,7 +115,7 @@ fun TodoListScreen(
                     Button(
                         onClick = {
                             scope.launch {
-                                repository.syncWithBackend()
+                                repository.loadFromServer()
                             }
                         },
                         modifier = Modifier.padding(top = 16.dp)
