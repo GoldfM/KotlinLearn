@@ -12,16 +12,10 @@ interface TodoDao {
     suspend fun getById(uid: String): TodoEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(todo: TodoEntity)
-
-    @Update
-    suspend fun update(todo: TodoEntity)
+    suspend fun insert(entity: TodoEntity)
 
     @Delete
-    suspend fun delete(todo: TodoEntity)
-
-    @Query("DELETE FROM todo_items WHERE uid = :uid")
-    suspend fun deleteById(uid: String)
+    suspend fun delete(entity: TodoEntity)
 
     @Query("SELECT * FROM todo_items WHERE isSynced = 0")
     suspend fun getUnsynced(): List<TodoEntity>

@@ -34,7 +34,7 @@ class TodoApiClient {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val baseUrl = "https://hive.mrdekk.ru/todo/"
+    private val baseUrl = "https://beta.mrdekk.ru/todo/"
     private val bearerToken = "6bbf91fe-9f2a-419a-a604-45b2148b11e0"
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
@@ -56,7 +56,7 @@ class TodoApiClient {
                 }
 
                 val json = response.body?.string() ?: throw IOException("Empty response")
-                log.debug("Response: $json")
+                log.debug("Загружен список задач, размер JSON: ${json.length}")
 
                 val obj = JSONObject(json)
 
@@ -64,17 +64,18 @@ class TodoApiClient {
 
                 currentRevision = obj.getInt("revision")
                 val list = obj.getJSONArray("list")
+                val items = parseTodoList(list)
 
-                parseTodoList(list)
+                log.info("✅ Загружено ${items.size} задач с сервера, ревизия: $currentRevision")
+                items
             }
         } catch (e: Exception) {
-            log.error("Failed to load todos: ${e.message}")
+            log.error("❌ Ошибка загрузки задач: ${e.message}")
             emptyList()
         }
     }
 
     suspend fun addTodo(todo: NetworkTodoItem): Boolean = withContext(Dispatchers.IO) {
-        // Создаем JSON с ключом "element"
         val elementJson = JSONObject().apply {
             put("id", todo.id)
             put("text", todo.text)
@@ -91,9 +92,11 @@ class TodoApiClient {
             put("element", elementJson)
         }
 
-        log.debug("=== ADD TODO REQUEST ===")
-        log.debug("Revision: $currentRevision")
-        log.debug("JSON: ${json.toString(2)}")
+        log.info("📤 ADD TODO REQUEST")
+        log.info("   Ревизия: $currentRevision")
+        log.info("   ID: ${todo.id}")
+        log.info("   Текст: ${todo.text}")
+        log.info("   Выполнено: ${todo.done}")
 
         val requestBody = RequestBody.create(jsonMediaType, json.toString())
         val request = Request.Builder()
@@ -107,30 +110,40 @@ class TodoApiClient {
             client.newCall(request).execute().use { response ->
                 val responseBody = response.body?.string() ?: ""
 
-                log.debug("=== ADD TODO RESPONSE ===")
-                log.debug("Status: ${response.code}")
-                log.debug("Body: $responseBody")
+                log.info("📥 ADD TODO RESPONSE")
+                log.info("   Статус: ${response.code}")
+                log.info("   Тело: $responseBody")
 
                 if (!response.isSuccessful) {
-                    log.error("HTTP ${response.code}: $responseBody")
+                    log.error("❌ HTTP ${response.code}: $responseBody")
                     return@use false
                 }
 
                 val obj = JSONObject(responseBody)
                 if (obj.getString("status") == "ok") {
-                    currentRevision = obj.getInt("revision")
+                    val newRevision = obj.getInt("revision")
+                    log.info("✅ Задача добавлена, новая ревизия: $newRevision")
+                    currentRevision = newRevision
                     true
                 } else {
+                    log.error("❌ API error: ${obj.optString("error", "Неизвестная ошибка")}")
                     false
                 }
             }
         } catch (e: Exception) {
-            log.error("Failed to add todo: ${e.message}")
+            log.error("❌ Ошибка при добавлении задачи: ${e.message}")
             false
         }
     }
 
     suspend fun updateTodo(todo: NetworkTodoItem): Boolean = withContext(Dispatchers.IO) {
+        log.info("🔄 UPDATE TODO REQUEST")
+        log.info("   ID: ${todo.id}")
+        log.info("   Текст: ${todo.text}")
+        log.info("   Выполнено: ${todo.done}")
+        log.info("   changedAt: ${todo.changedAt}")
+        log.info("   Текущая ревизия: $currentRevision")
+
         val elementJson = JSONObject().apply {
             put("id", todo.id)
             put("text", todo.text)
@@ -147,6 +160,8 @@ class TodoApiClient {
             put("element", elementJson)
         }
 
+        log.debug("JSON для отправки: ${json.toString(2)}")
+
         val requestBody = RequestBody.create(jsonMediaType, json.toString())
         val request = Request.Builder()
             .url("${baseUrl}list/${todo.id}")
@@ -157,10 +172,31 @@ class TodoApiClient {
 
         return@withContext try {
             client.newCall(request).execute().use { response ->
-                handleResponse(response, "update")
+                val responseBody = response.body?.string() ?: ""
+
+                log.info("📡 UPDATE TODO RESPONSE")
+                log.info("   Статус: ${response.code}")
+                log.info("   Тело: $responseBody")
+
+                if (!response.isSuccessful) {
+                    log.error("❌ HTTP ${response.code}: $responseBody")
+                    return@use false
+                }
+
+                val obj = JSONObject(responseBody)
+                if (obj.getString("status") == "ok") {
+                    val newRevision = obj.getInt("revision")
+                    log.info("✅ Задача обновлена, новая ревизия: $newRevision")
+                    currentRevision = newRevision
+                    true
+                } else {
+                    val error = obj.optString("error", "Неизвестная ошибка")
+                    log.error("❌ API error: $error")
+                    false
+                }
             }
         } catch (e: Exception) {
-            log.error("Failed to update todo: ${e.message}")
+            log.error("❌ Ошибка при обновлении задачи: ${e.message}")
             false
         }
     }
@@ -178,7 +214,7 @@ class TodoApiClient {
                 handleResponse(response, "delete")
             }
         } catch (e: Exception) {
-            log.error("Failed to delete todo: ${e.message}")
+            log.error("❌ Ошибка при удалении задачи: ${e.message}")
             false
         }
     }
@@ -187,15 +223,19 @@ class TodoApiClient {
         val responseBody = response.body?.string() ?: ""
 
         if (!response.isSuccessful) {
-            log.error("HTTP ${response.code} when $operation todo: $responseBody")
+            log.error("❌ HTTP ${response.code} when $operation todo: $responseBody")
             return false
         }
 
         val obj = JSONObject(responseBody)
 
-        if (obj.getString("status") != "ok") return false
+        if (obj.getString("status") != "ok") {
+            log.error("❌ API error when $operation: ${obj.optString("error", "Неизвестная ошибка")}")
+            return false
+        }
 
         currentRevision = obj.getInt("revision")
+        log.info("✅ Операция '$operation' успешна, новая ревизия: $currentRevision")
         return true
     }
 
