@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,20 +15,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.todos.ui.theme.ToDosTheme
-import org.slf4j.LoggerFactory
-import androidx.compose.foundation.background
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        val log = LoggerFactory.getLogger(MainActivity::class.java)
         super.onCreate(savedInstanceState)
 
-        log.info("Приложение запущено")
-
         setContent {
-            ToDosTheme {
+            MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -44,6 +38,7 @@ fun TodoApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
 
+    // Создаем репозиторий с Room вместо FileStorage
     val repository = remember {
         TodoRepository(context)
     }
@@ -52,6 +47,7 @@ fun TodoApp() {
         navController = navController,
         startDestination = "todo_list"
     ) {
+        // Экран списка задач
         composable("todo_list") {
             TodoListScreen(
                 repository = repository,
@@ -64,6 +60,7 @@ fun TodoApp() {
             )
         }
 
+        // Экран создания новой задачи
         composable("edit_todo") {
             EditTodoScreen(
                 todoItem = null,
@@ -77,6 +74,7 @@ fun TodoApp() {
             )
         }
 
+        // Экран редактирования существующей задачи
         composable(
             route = "edit_todo/{todoId}",
             arguments = listOf(
@@ -87,12 +85,15 @@ fun TodoApp() {
         ) { backStackEntry ->
             val todoId = backStackEntry.arguments?.getString("todoId")!!
 
+            // Состояние для хранения загруженной задачи
             var todoItem by remember { mutableStateOf<TodoItem?>(null) }
 
+            // Загружаем задачу по ID при открытии экрана
             LaunchedEffect(todoId) {
                 todoItem = repository.getTodoById(todoId)
             }
 
+            // Показываем экран редактирования или индикатор загрузки
             if (todoItem != null) {
                 EditTodoScreen(
                     todoItem = todoItem,
@@ -105,6 +106,7 @@ fun TodoApp() {
                     }
                 )
             } else {
+                // Индикатор загрузки пока задача загружается
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

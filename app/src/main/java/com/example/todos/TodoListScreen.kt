@@ -30,7 +30,7 @@ fun TodoListScreen(
     onTodoClick: (TodoItem) -> Unit,
     onAddTodo: () -> Unit
 ) {
-    val todos by repository.todosFlow.collectAsState()
+    val todos by repository.todosFlow.collectAsState(initial = emptyList())
     val syncState by repository.syncState.collectAsState()
 
     var deletedItem by remember { mutableStateOf<TodoItem?>(null) }

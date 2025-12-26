@@ -16,7 +16,10 @@ data class TodoItem(
     val uid: String = UUID.randomUUID().toString(),
     val isDone: Boolean = false,
     val color: Color = Color.White,
-    val deadline: Date? = null
+    val deadline: Date? = null,
+    // Добавляем временные метки для синхронизации
+    val createdAt: Long = System.currentTimeMillis(),
+    val changedAt: Long = System.currentTimeMillis()
 )
 
 data class EditTodoState(
@@ -26,7 +29,7 @@ data class EditTodoState(
     val deadline: Date? = null
 )
 
-// Добавь эти расширения в конец файла:
+// Конвертация TodoItem <-> TodoEntity
 fun TodoItem.toEntity(): TodoEntity {
     return TodoEntity(
         uid = uid,
@@ -35,6 +38,8 @@ fun TodoItem.toEntity(): TodoEntity {
         isDone = isDone,
         color = color.value.toLong(),
         deadline = deadline?.time,
+        createdAt = createdAt, // Сохраняем оригинальное время создания
+        updatedAt = System.currentTimeMillis(), // Время последнего обновления
         isSynced = false
     )
 }
@@ -46,6 +51,8 @@ fun TodoEntity.toTodoItem(): TodoItem {
         priority = Priority.valueOf(priority),
         isDone = isDone,
         color = Color(color.toULong()),
-        deadline = deadline?.let { Date(it) }
+        deadline = deadline?.let { Date(it) },
+        createdAt = createdAt, // Восстанавливаем время создания
+        changedAt = updatedAt   // Используем updatedAt как changedAt
     )
 }

@@ -1,10 +1,10 @@
 package com.example.myapplication
 
 import androidx.room.*
-import android.content.Context
-import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import android.content.Context
 
 @Database(
     entities = [TodoEntity::class],
@@ -25,8 +25,7 @@ abstract class TodoDatabase : RoomDatabase() {
                     context.applicationContext,
                     TodoDatabase::class.java,
                     "todo_database"
-                )
-                    .fallbackToDestructiveMigration()
+                ).fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance
